@@ -1,0 +1,6 @@
+joblib
+spacy
+pandas
+scikit-learn
+spacy[en_core_web_sm]
+flask
