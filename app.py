@@ -5,17 +5,18 @@ import spacy
 import pandas as pd
 import re
 
-# Initialize Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-# Load model and data
 model = joblib.load('models/final_model.joblib')
 df_mapping = pd.read_csv('datasets/control_to_technique_mapping.csv')
 df_controls = pd.read_csv('datasets/control_train_data.csv')
+try:
+    df_ttp_desc = pd.read_csv('datasets/ttp-desc-mappings.csv', delimiter='\t', engine='python')
+except Exception as e:
+    print("Error reading CSV file:", e)
 nlp = spacy.load('en_core_web_sm')
 
-# Helper functions
 def preprocess_text(text):
     doc = nlp(text)
     tokens = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
@@ -31,6 +32,11 @@ def find_control_id_by_technique(technique_id):
     if control_ids.size == 0:
         return f"No control found for Technique ID {technique_id}"
     return control_ids
+
+def find_description_by_technique(technique_id):
+    technique_id = technique_id[0].lower() + technique_id[1:]
+    description = df_ttp_desc[df_ttp_desc['ttp'] == technique_id]['description']
+    return description.iloc[0] if not description.empty else "No description available."
 
 def clean_and_summarize(text):
     cleaned_text = re.sub(r'\[Assignment:.*?\]', '', text)
@@ -70,17 +76,22 @@ def find_and_summarize_control_details(input_sentence):
     control_ids = find_control_id_by_technique(technique_id)
     if isinstance(control_ids, str):
         return control_ids  # Return error message if no control ID found
+    
+    description = find_description_by_technique(technique_id)
+    print(f"Predicted Technique ID: {description} {technique_id}")
     summarized_details = summarize_control_details(control_ids)
-    return summarized_details
+    return {"description": description, "summarized_details": summarized_details}
 
-# API Endpoint
 @app.route('/summarize', methods=['POST'])
 def summarize():
     data = request.json
     input_sentence = data.get('sentence', '')
+    
+    if len(input_sentence) < 12:
+        return jsonify(error="Enter a valid prompt"), 400
+    
     summary = find_and_summarize_control_details(input_sentence)
-    # return jsonify(summary=summary)
+    return jsonify(summary=summary)
 
-# Run the Flask app
 if __name__ == '__main__':
     app.run(debug=True)

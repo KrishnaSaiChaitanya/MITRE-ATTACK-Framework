@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NLP_G-20</title>
+    <title>Find TTPs - NLP_G-20</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
         integrity="sha384-k6RqeWeci5ZR/Lv4MR0sA0FfDOM+Qs1bMRp4d6MpzFVEJoepTf4m/xZ++4vuv3/x" crossorigin="anonymous">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.7.3/lottie.min.js"></script>
 </head>
 
 <body class="bg-gray-100 flex flex-col h-screen">
-
     <!-- Navbar -->
     <header class="bg-blue-600 p-4">
         <nav class="container mx-auto flex justify-between items-center">
@@ -19,19 +19,178 @@
         </nav>
     </header>
 
-    <!-- Main Content -->
-    <main class="flex-grow flex items-center justify-center">
-        <div class="text-center space-y-6">
-            <a href="explore.html"
-                class="block w-full py-4 px-8 bg-blue-500 text-white text-lg font-semibold rounded hover:bg-blue-600 transition duration-300 flex items-center justify-center">
-                <i class="fas fa-search mr-2"></i> Explore MITRE
-            </a>
-            <a href="findttps.html"
-                class="block w-full py-4 px-8 bg-green-500 text-white text-lg font-semibold rounded hover:bg-green-600 transition duration-300 flex items-center justify-center">
-                <i class="fas fa-list-alt mr-2"></i> Find TTPs
-            </a>
+    <!-- Toast Notification (Initially hidden) -->
+    <div id="toast" class="fixed top-5 right-5 hidden bg-red-500 text-white px-4 py-2 rounded shadow-md">
+        <span id="toastMessage">Error: Unable to fetch data.</span>
+    </div>
+
+    <!-- Loading Animation Container (Initially hidden) -->
+    <div id="loadingContainer" class="flex-grow flex items-center justify-center hidden">
+        <div id="loadingAnimation" class="w-64 h-64"></div>
+    </div>
+
+    <!-- Summary Result (Initially hidden) -->
+    <div id="summaryContainer" class="hidden mx-auto p-4 bg-white rounded shadow-lg mt-8 w-3/4">
+        <h2 class="text-xl font-bold mb-2">TTP'S Summary</h2>
+        <p id="summaryDescription" class="text-gray-500 mb-4 p-3">Description goes here...</p>
+        <h2 class="text-xl font-bold mb-4">Recommended Prevention Measures</h2>
+
+        <div id="summaryContent" class="text-gray-700"></div>
+    </div>
+
+
+    <!-- Placeholder Message (Initially visible) -->
+    <div id="placeholderMessage" class="bg-gray-100 flex flex-col items-center justify-center h-screen gap-5">
+        <img src="https://www.svgrepo.com/show/168/searching.svg" alt="Searching Icon" class="h-64" />
+        <h1 class="text-2xl font-bold">Please enter your query to get TTP'S</h1>
+    </div>
+
+
+    <!-- Search Bar (Fixed at the bottom) -->
+    <footer class="fixed bottom-0 w-full bg-white p-4 shadow-md">
+        <div class="container mx-auto flex items-center justify-center space-x-3">
+            <input type="text" id="searchInput" placeholder="Search..."
+                class="flex-grow p-3 border rounded-lg focus:outline-none focus:border-blue-500">
+            <button id="searchButton"
+                class="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 focus:outline-none flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" height="20px">
+                    <path
+                        d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.2 160 480l0-83.6c0-4 1.5-7.8 4.2-10.8L331.8 202.8c5.8-6.3 5.6-16-.4-22s-15.7-6.4-22-.7L106 360.8 17.7 316.6C7.1 311.3 .3 300.7 0 288.9s5.9-22.8 16.1-28.7l448-256c10.7-6.1 23.9-5.5 34 1.4z" />
+                </svg>
+            </button>
         </div>
-    </main>
+    </footer>
+
+    <script>
+        // Load Lottie Animation
+        const loadingAnimation = lottie.loadAnimation({
+            container: document.getElementById('loadingAnimation'),
+            renderer: 'svg',
+            loop: true,
+            autoplay: false,
+            path: './assets/loading.json'
+        });
+
+        // Function to display toast message
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Function to show loading animation, make API request, and display summary
+        document.getElementById('searchButton').addEventListener('click', function () {
+            const inputSentence = document.getElementById('searchInput').value;
+
+            document.getElementById('placeholderMessage').classList.add('hidden');
+            document.getElementById('summaryContainer').classList.add('hidden');
+            document.getElementById('loadingContainer').classList.remove('hidden');
+            loadingAnimation.play();
+
+            // Make API call to Flask backend
+            fetch('http://127.0.0.1:5000/summarize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sentence: inputSentence })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loadingContainer').classList.add('hidden');
+                    loadingAnimation.stop();
+                    document.getElementById('summaryContainer').classList.remove('hidden');
+                    // Display summary description from API response
+                    document.getElementById('summaryDescription').textContent = data.summary.description;
+
+                    // Clear previous content
+                    const summaryContent = document.getElementById('summaryContent');
+                    summaryContent.innerHTML = '';
+                    console.log(data);
+
+                    // Display summary as accordion
+                    // Display summary as accordion
+                    data.summary.summarized_details.forEach(item => {
+                        // Create accordion item
+                        const accordionItem = document.createElement('div');
+                        accordionItem.classList.add('border', 'rounded', 'mb-2');
+
+                        // Create accordion heading with SVG arrow
+                        const heading = document.createElement('h3');
+                        heading.classList.add('bg-blue-100', 'p-3', 'text-blue-700', 'cursor-pointer', 'font-semibold', 'flex', 'justify-between', 'items-center');
+                        heading.textContent = item['Control Name'];
+
+                        // SVG arrow icon
+                        const arrowIcon = document.createElement('span');
+                        arrowIcon.classList.add('transition-transform', 'duration-300'); // Add transition
+                        arrowIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" height="16" width="16" class="fill-current text-blue-700">
+                    <path d="M233.4 105.4c12.5-12.5 32.8-12.5 45.3 0l192 192c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L256 173.3 86.6 342.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l192-192z"/>
+                </svg>`;
+                        heading.appendChild(arrowIcon);
+
+                        // Toggle content visibility and rotate arrow
+                        heading.onclick = () => {
+                            content.classList.toggle('hidden');
+                            arrowIcon.classList.toggle('rotate-180'); // Rotate arrow when open
+                        };
+                        accordionItem.appendChild(heading);
+
+                        // Create content for each control (initially hidden)
+                        const content = document.createElement('div');
+                        content.classList.add('p-4', 'hidden');
+
+                        // Create list for control description
+                        const summaryList = document.createElement('ul');
+                        summaryList.classList.add('list-disc', 'pl-5', 'space-y-1');
+
+                        // Split description by newline, remove semicolons, and create list items
+                        const descriptionLines = item['Summary of Control Description'].replace(/;/g, '').split('\n');
+                        descriptionLines.forEach(line => {
+                            if (line.trim()) {
+                                const listItem = document.createElement('li');
+                                listItem.textContent = line.trim();
+
+                                // Check for sub-list notation (like 'a.', 'i.')
+                                if (/^[a-z]\./.test(line.trim()) || /^[i]+\./.test(line.trim())) {
+                                    // Create a sub-list if it starts with a notation
+                                    const subList = document.createElement('ul');
+                                    subList.classList.add('list-[arrow]', 'pl-5', 'ml-3');
+                                    const subListItem = document.createElement('li');
+                                    subListItem.textContent = line.trim().replace(/^[a-z]\.|^[i]+\./, '').trim();
+                                    subList.appendChild(subListItem);
+
+                                    // Append sub-list to previous list item
+                                    const previousItem = summaryList.lastElementChild;
+                                    if (previousItem) {
+                                        previousItem.appendChild(subList);
+                                    }
+                                } else {
+                                    // Append as regular list item
+                                    summaryList.appendChild(listItem);
+                                }
+                            }
+                        });
+
+                        content.appendChild(summaryList);
+                        accordionItem.appendChild(content);
+                        summaryContent.appendChild(accordionItem);
+                    });
+
+
+                    document.getElementById('summaryContainer').classList.remove('hidden');
+                })
+                .catch(error => {
+                    document.getElementById('loadingContainer').classList.add('hidden');
+                    loadingAnimation.stop();
+                    showToast("Error: Please enter a valid prompt.");
+                    console.error(error);
+                });
+        });
+    </script>
 
 </body>
 
